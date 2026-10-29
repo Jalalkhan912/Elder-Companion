@@ -4,14 +4,15 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
 from pydantic import TypeAdapter
 
-from .models import (AnalysisResult, Conversation, ConversationStatus, Profile,
-                     Turn, WarningItem)
+from .config import EMAIL_MAX_CLAIMS, STALE_CLAIM_SECONDS
+from .models import (SHORT_CHAT_SUMMARY, AnalysisResult, Conversation,
+                     ConversationStatus, Profile, Turn, WarningItem)
 
 _TURNS = TypeAdapter(list[Turn])
 _WARNINGS = TypeAdapter(list[WarningItem])
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS email_log (
     recipients TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     error TEXT,
+    attempts INTEGER NOT NULL DEFAULT 1,
+    claimed_at TEXT,
     created_at TEXT NOT NULL,
     sent_at TEXT
 );
@@ -197,16 +200,14 @@ class Database:
 
     def record_analysis_failure(self, conv_id: int, max_attempts: int) -> ConversationStatus:
         with self._lock:
-            self._conn.execute(
+            self._exec(
                 """UPDATE conversations SET analysis_attempts = analysis_attempts + 1,
                    status = CASE WHEN analysis_attempts + 1 >= ? THEN 'analysis_failed'
                                  ELSE status END
                    WHERE id = ?""",
                 (max_attempts, conv_id),
             )
-            self._conn.commit()
-            rows = self._conn.execute(
-                "SELECT status FROM conversations WHERE id = ?", (conv_id,)).fetchall()
+            rows = self._query("SELECT status FROM conversations WHERE id = ?", (conv_id,))
         return rows[0]["status"]
 
     def get_conversation(self, conv_id: int) -> Conversation | None:
@@ -214,9 +215,11 @@ class Database:
         return self._conv(rows[0]) if rows else None
 
     def recent_analyzed(self, limit: int) -> list[Conversation]:
+        """Newest analyzed chats for memory; empty (short) chats never take a slot."""
         rows = self._query(
             "SELECT * FROM conversations WHERE status = 'analyzed' "
-            "ORDER BY started_at DESC, id DESC LIMIT ?", (limit,))
+            "AND (summary IS NULL OR summary != ?) "
+            "ORDER BY started_at DESC, id DESC LIMIT ?", (SHORT_CHAT_SUMMARY, limit))
         return [self._conv(r) for r in rows]
 
     def pending_analysis(self, max_attempts: int) -> list[Conversation]:
@@ -236,21 +239,65 @@ class Database:
                 "ORDER BY ended_at, id", (_iso(since),))
         return [self._conv(r) for r in rows]
 
+    def urgent_unsent(self) -> list[Conversation]:
+        """Analyzed chats with an urgent warning whose urgent email is not sent yet
+        and can still be claimed (no row, a failed row, or a stale pending claim)."""
+        stale = _iso(datetime.now(timezone.utc) - timedelta(seconds=STALE_CLAIM_SECONDS))
+        rows = self._query(
+            """SELECT c.* FROM conversations c
+               WHERE c.status = 'analyzed'
+                 AND EXISTS (SELECT 1 FROM json_each(c.warnings) w
+                             WHERE json_extract(w.value, '$.level') = 'urgent')
+                 AND NOT EXISTS (
+                     SELECT 1 FROM email_log e
+                     WHERE e.kind = 'urgent' AND e.conversation_id = c.id
+                       AND (e.status = 'sent' OR e.attempts >= ?
+                            OR (e.status = 'pending'
+                                AND COALESCE(e.claimed_at, e.created_at) >= ?)))
+               ORDER BY c.id""",
+            (EMAIL_MAX_CLAIMS, stale))
+        return [self._conv(r) for r in rows]
+
     # ---- emails ----
     def claim_email(self, kind: Literal["urgent", "daily"], recipients: list[str],
                     conversation_id: int | None = None,
                     period_date: date | None = None) -> int | None:
+        """Claim the right to send one email; returns its row id, or None if it is
+        already sent, being sent by someone else, or out of claims.
+
+        A key that failed, or whose 'pending' claim went stale (the sender died),
+        is re-claimed atomically by a single UPDATE, at most EMAIL_MAX_CLAIMS times."""
+        now = _now()
+        period = period_date.isoformat() if period_date else None
         try:
             cur = self._exec(
                 """INSERT INTO email_log (kind, conversation_id, period_date, recipients,
-                   status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)""",
-                (kind, conversation_id,
-                 period_date.isoformat() if period_date else None,
-                 ",".join(recipients), _now()),
+                   status, attempts, claimed_at, created_at)
+                   VALUES (?, ?, ?, ?, 'pending', 1, ?, ?)""",
+                (kind, conversation_id, period, ",".join(recipients), now, now),
             )
+            return int(cur.lastrowid)
         except sqlite3.IntegrityError:
-            return None
-        return int(cur.lastrowid)
+            pass
+        key_sql, key = (("conversation_id = ?", conversation_id) if kind == "urgent"
+                        else ("period_date = ?", period))
+        stale = _iso(datetime.now(timezone.utc) - timedelta(seconds=STALE_CLAIM_SECONDS))
+        with self._lock:
+            cur = self._exec(
+                f"""UPDATE email_log SET status = 'pending', claimed_at = ?,
+                       attempts = attempts + 1, error = NULL, sent_at = NULL,
+                       recipients = ?
+                    WHERE kind = ? AND {key_sql} AND attempts < ?
+                      AND (status = 'failed'
+                           OR (status = 'pending'
+                               AND COALESCE(claimed_at, created_at) < ?))""",
+                (now, ",".join(recipients), kind, key, EMAIL_MAX_CLAIMS, stale),
+            )
+            if cur.rowcount != 1:
+                return None
+            rows = self._query(
+                f"SELECT id FROM email_log WHERE kind = ? AND {key_sql}", (kind, key))
+        return int(rows[0]["id"])
 
     def mark_email(self, email_id: int, status: Literal["sent", "failed"],
                    error: str | None = None) -> None:

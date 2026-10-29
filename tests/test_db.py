@@ -133,3 +133,141 @@ def test_two_connections_send_once_and_no_lock_left_behind(tmp_path):
     assert isinstance(b.claim_email("daily", r, period_date=date(2026, 10, 29)), int)
     assert a.claim_email("daily", r, period_date=date(2026, 10, 29)) is None
     assert isinstance(b.create_conversation("r", T0), int)
+
+
+# ---- final-review fixes: email re-claim (R12), short-chat memory, failure rollback ----
+
+URGENT_W = WarningItem(level="urgent", reason="fell", quote="I fell")
+
+
+def _email_row(db, kind="urgent"):
+    return db._query("SELECT * FROM email_log WHERE kind = ?", (kind,))[0]
+
+
+def _age_claim(db, seconds):
+    old = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat(
+        timespec="microseconds")
+    db._exec("UPDATE email_log SET claimed_at = ?", (old,))
+
+
+def test_claim_email_reclaims_failed_row_capped_at_three(db):
+    from voice_agent.config import EMAIL_MAX_CLAIMS
+    assert EMAIL_MAX_CLAIMS == 3
+    r = ["a@example.com"]
+    first = db.claim_email("urgent", r, conversation_id=1)
+    assert _email_row(db)["attempts"] == 1 and _email_row(db)["claimed_at"]
+    db.mark_email(first, "failed", "boom")
+    again = db.claim_email("urgent", r, conversation_id=1)
+    assert again == first
+    row = _email_row(db)
+    assert (row["status"], row["error"], row["attempts"]) == ("pending", None, 2)
+    db.mark_email(first, "failed", "boom")
+    assert db.claim_email("urgent", r, conversation_id=1) == first
+    db.mark_email(first, "failed", "boom")
+    assert db.claim_email("urgent", r, conversation_id=1) is None  # capped at 3 claims
+    assert _email_row(db)["attempts"] == 3
+    assert not db._conn.in_transaction
+
+
+def test_claim_email_never_reclaims_sent_row(db):
+    r = ["a@example.com"]
+    eid = db.claim_email("daily", r, period_date=date(2026, 10, 29))
+    db.mark_email(eid, "sent")
+    _age_claim(db, 3600)
+    assert db.claim_email("daily", r, period_date=date(2026, 10, 29)) is None
+
+
+def test_claim_email_stale_pending_reclaimable_fresh_not(db):
+    from voice_agent.config import STALE_CLAIM_SECONDS
+    assert STALE_CLAIM_SECONDS == 300
+    r = ["a@example.com"]
+    eid = db.claim_email("urgent", r, conversation_id=1)
+    _age_claim(db, 240)  # 4 minutes: still fresh
+    assert db.claim_email("urgent", r, conversation_id=1) is None
+    _age_claim(db, 301)
+    assert db.claim_email("urgent", r, conversation_id=1) == eid
+    assert _email_row(db)["attempts"] == 2
+
+
+def _shared_db(tmp_path):
+    from voice_agent.db import Database
+    d = Database(tmp_path / "shared.db")
+    d.init_schema()
+    return d
+
+
+def test_two_databases_cannot_both_reclaim(tmp_path):
+    a = _shared_db(tmp_path)
+    b = _shared_db(tmp_path)
+    r = ["a@example.com"]
+    eid = a.claim_email("urgent", r, conversation_id=1)
+    a.mark_email(eid, "failed", "boom")
+    assert b.claim_email("urgent", r, conversation_id=1) == eid
+    assert a.claim_email("urgent", r, conversation_id=1) is None
+    assert not a._conn.in_transaction and not b._conn.in_transaction
+
+
+def _urgent_analyzed(db, n):
+    cid = db.create_conversation(f"u{n}", T0 + timedelta(hours=n))
+    db.finish_conversation(cid, T0 + timedelta(hours=n, minutes=5), "user_ended", _turns())
+    db.save_analysis(cid, AnalysisResult(summary="s", mood="low", warnings=[URGENT_W]))
+    return cid
+
+
+def test_urgent_unsent_lists_claimable_urgent_conversations(db):
+    r = ["a@example.com"]
+    _analyzed(db, 1)  # no warnings
+    mild = db.create_conversation("m", T0)
+    db.finish_conversation(mild, T0, "x", _turns())
+    db.save_analysis(mild, AnalysisResult(summary="s", mood="okay", warnings=[
+        WarningItem(level="mild", reason="sleep", quote="q")]))
+    no_row = _urgent_analyzed(db, 2)
+    failed = _urgent_analyzed(db, 3)
+    db.mark_email(db.claim_email("urgent", r, conversation_id=failed), "failed", "x")
+    sent = _urgent_analyzed(db, 4)
+    db.mark_email(db.claim_email("urgent", r, conversation_id=sent), "sent")
+    fresh = _urgent_analyzed(db, 5)
+    db.claim_email("urgent", r, conversation_id=fresh)
+    assert [c.id for c in db.urgent_unsent()] == [no_row, failed]
+    # stale pending becomes claimable; exhausted failed rows drop out
+    _age_claim(db, 400)
+    for _ in range(2):
+        eid = db.claim_email("urgent", r, conversation_id=failed)
+        db.mark_email(eid, "failed", "x")
+    assert [c.id for c in db.urgent_unsent()] == [no_row, fresh]
+
+
+def test_recent_analyzed_skips_short_chats(db):
+    from voice_agent.models import SHORT_CHAT_SUMMARY
+    real = [_analyzed(db, n) for n in range(5)]
+    for n in range(5, 8):  # three accidental Talk->End taps, newest of all
+        cid = db.create_conversation(f"short{n}", T0 + timedelta(hours=n))
+        db.finish_conversation(cid, T0 + timedelta(hours=n), "user_ended", [])
+        db.save_analysis(cid, AnalysisResult(summary=SHORT_CHAT_SUMMARY, mood="okay"))
+    assert sorted(c.id for c in db.recent_analyzed(5)) == sorted(real)
+
+
+def test_short_chat_summary_shared_with_analysis():
+    from voice_agent import analysis, models
+    assert analysis.SHORT_CHAT_SUMMARY == models.SHORT_CHAT_SUMMARY
+
+
+def test_record_analysis_failure_rolls_back_on_error(db):
+    import sqlite3
+    cid = db.create_conversation("r", T0)
+    db.finish_conversation(cid, T0, "x", _turns())
+    real = db._conn
+
+    class FailingCommit:
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        def commit(self):
+            raise sqlite3.OperationalError("disk I/O error")
+
+    db._conn = FailingCommit()
+    with pytest.raises(sqlite3.OperationalError):
+        db.record_analysis_failure(cid, 3)
+    db._conn = real
+    assert not real.in_transaction
+    assert db.get_conversation(cid).analysis_attempts == 0

@@ -17,6 +17,8 @@ MEMORY_SIZE = 5
 USER_AWAY_SECONDS = 120
 MAX_CALL_SECONDS = 45 * 60
 MAX_ANALYSIS_ATTEMPTS = 3
+EMAIL_MAX_CLAIMS = 3        # an email key may be claimed (and sent) at most 3 times
+STALE_CLAIM_SECONDS = 300   # a 'pending' claim older than this is presumed dead
 
 _REQUIRED = ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
              "RESEND_API_KEY", "EMAIL_FROM")

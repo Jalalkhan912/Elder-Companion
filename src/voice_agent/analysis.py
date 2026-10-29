@@ -6,9 +6,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from voice_agent.config import LLM_MODEL
-from voice_agent.models import AnalysisResult, Turn
-
-SHORT_CHAT_SUMMARY = "A very short chat with nothing much said."
+from voice_agent.models import SHORT_CHAT_SUMMARY, AnalysisResult, Turn
 
 ANALYSIS_SYSTEM_PROMPT = """\
 You review a phone conversation between an elderly parent ("Parent") and a friendly \

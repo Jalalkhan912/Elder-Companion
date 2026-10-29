@@ -71,6 +71,13 @@ def daily_email(profile: Profile, convs: list[Conversation], period_date: date) 
     moods = [c.mood for c in analyzed if c.mood in _MOOD_ORDER]
     if moods:
         parts.append(f"<p>Overall mood: {escape(min(moods, key=_MOOD_ORDER.__getitem__))}</p>")
+    urgent = [w for c in analyzed for w in c.warnings if w.level == "urgent"]
+    if urgent:
+        items = "".join(
+            f"<li><b>Urgent: {escape(w.reason)}</b>: &ldquo;{escape(w.quote)}&rdquo;</li>"
+            for w in urgent
+        )
+        parts.append(f"<p><b>Urgent concerns</b> (please check on them):</p><ul>{items}</ul>")
     mild = [w for c in analyzed for w in c.warnings if w.level == "mild"]
     if mild:
         items = "".join(

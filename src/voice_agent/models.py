@@ -10,6 +10,9 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 AgentRole = Literal["son", "daughter", "friend", "companion"]
 ConversationStatus = Literal["in_progress", "pending_analysis", "analyzed", "analysis_failed"]
 
+# Stored as the summary of a chat in which the parent said nothing.
+SHORT_CHAT_SUMMARY = "A very short chat with nothing much said."
+
 
 class Profile(BaseModel):
     parent_name: str = Field(min_length=1)

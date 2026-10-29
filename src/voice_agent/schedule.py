@@ -9,7 +9,7 @@ from voice_agent.analysis import TextLLM
 from voice_agent.config import MAX_ANALYSIS_ATTEMPTS
 from voice_agent.db import Database
 from voice_agent.models import Profile
-from voice_agent.notify import EmailSender, send_daily
+from voice_agent.notify import EmailSender, send_daily, send_urgent
 from voice_agent.postcall import process_conversation
 
 log = logging.getLogger(__name__)
@@ -53,6 +53,26 @@ async def retry_job(db: Database, llm: TextLLM, sender: EmailSender) -> None:
             await process_conversation(db, conv.id, llm, sender)
         except Exception:
             log.exception("retry job failed for conversation %s", conv.id)
+    await _resend_missed_urgent(db, sender, cutoff)
+
+
+async def _resend_missed_urgent(db: Database, sender: EmailSender, cutoff: datetime) -> None:
+    """Urgent emails lost to a crash or a failed send get another (capped) try."""
+    try:
+        unsent = db.urgent_unsent()
+        profile = db.get_profile() if unsent else None
+    except Exception:
+        log.exception("retry job failed to list unsent urgent emails")
+        return
+    if profile is None:
+        return
+    for conv in unsent:
+        if conv.ended_at is None or conv.ended_at > cutoff:
+            continue
+        try:
+            await send_urgent(db, profile, conv, sender)
+        except Exception:
+            log.exception("retry job failed to send urgent email for conversation %s", conv.id)
 
 
 def build_scheduler(db: Database, llm: TextLLM, sender: EmailSender) -> AsyncIOScheduler:

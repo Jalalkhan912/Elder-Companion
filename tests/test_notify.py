@@ -114,3 +114,20 @@ def test_daily_covers_since_last_daily(db, profile):
     assert asyncio.run(send_daily(db, profile, date(2026, 10, 29), sender, _nosleep))
     html = sender.sent[1][2]
     assert "SECOND chat" in html and "FIRST chat" not in html
+
+
+def test_daily_lists_urgent_warnings(db, profile):
+    now = datetime.now(timezone.utc)
+    a = _conv(db, now, AnalysisResult(summary="s", mood="low", warnings=[URGENT]))
+    _, html = daily_email(profile, [a], date(2026, 10, 29))
+    assert "Urgent" in html
+    assert "chest pain" in html and "my chest hurts badly" in html
+
+
+def test_send_urgent_retries_after_failed_row(db, profile):
+    conv = _urgent_conv(db)
+    sender = FakeSender(fail_times=3)
+    assert asyncio.run(send_urgent(db, profile, conv, sender, _nosleep)) is False
+    assert asyncio.run(send_urgent(db, profile, conv, sender, _nosleep)) is True
+    assert _status(db) == ("sent", None)
+    assert len(sender.sent) == 1
