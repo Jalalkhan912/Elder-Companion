@@ -1,0 +1,42 @@
+[
+  {
+    "role": "assistant",
+    "text": "Hello Abbu, it's Ayesha. How is your day going?",
+    "at": "2026-10-29T10:00:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Oh Ayesha, I'm very well today. I walked in the garden this morning and the roses are blooming.",
+    "at": "2026-10-29T10:01:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "That sounds lovely. Did you have breakfast?",
+    "at": "2026-10-29T10:02:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Yes, parathas and tea. Your cousin Imran dropped by and we laughed for an hour.",
+    "at": "2026-10-29T10:03:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "I'm so glad. Anything planned for later?",
+    "at": "2026-10-29T10:04:00Z"
+  },
+  {
+    "role": "user",
+    "text": "I will watch the cricket match this afternoon and then take a nice nap.",
+    "at": "2026-10-29T10:05:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "Sounds perfect, Abbu. I'll call again soon.",
+    "at": "2026-10-29T10:06:00Z"
+  },
+  {
+    "role": "user",
+    "text": "God bless you, beta. I feel good today.",
+    "at": "2026-10-29T10:07:00Z"
+  }
+]

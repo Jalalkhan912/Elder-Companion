@@ -1,0 +1,42 @@
+[
+  {
+    "role": "assistant",
+    "text": "Hello Abbu, it's Ayesha. How are you feeling?",
+    "at": "2026-10-29T10:00:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Just quiet, beta. The house feels very empty since your mother passed.",
+    "at": "2026-10-29T10:01:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "I'm sorry, Abbu. Have you been seeing friends?",
+    "at": "2026-10-29T10:02:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Not really. Nobody visits much now. I feel lonely most days.",
+    "at": "2026-10-29T10:03:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "Have you been sleeping okay?",
+    "at": "2026-10-29T10:04:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Not well. I wake at three in the morning and cannot sleep again. I have no appetite either.",
+    "at": "2026-10-29T10:05:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "I'm here with you. Would you like to tell me about old times?",
+    "at": "2026-10-29T10:06:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Maybe. I just feel a bit low today, that's all. Nothing serious.",
+    "at": "2026-10-29T10:07:00Z"
+  }
+]

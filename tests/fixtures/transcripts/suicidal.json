@@ -1,0 +1,42 @@
+[
+  {
+    "role": "assistant",
+    "text": "Hello Abbu, it's Ayesha. How are you today?",
+    "at": "2026-10-29T10:00:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Not good, Ayesha. Everything feels heavy since your mother is gone.",
+    "at": "2026-10-29T10:01:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "I'm here, Abbu. Tell me what's on your mind.",
+    "at": "2026-10-29T10:02:00Z"
+  },
+  {
+    "role": "user",
+    "text": "I don't see the point in going on anymore.",
+    "at": "2026-10-29T10:03:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "That sounds very painful. Can you tell me more?",
+    "at": "2026-10-29T10:04:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Sometimes I wish I wouldn't wake up in the morning.",
+    "at": "2026-10-29T10:05:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "Abbu, I care about you very much. You are not alone.",
+    "at": "2026-10-29T10:06:00Z"
+  },
+  {
+    "role": "user",
+    "text": "I know you do, beta. But the thoughts keep coming.",
+    "at": "2026-10-29T10:07:00Z"
+  }
+]

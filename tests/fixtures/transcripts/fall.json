@@ -1,0 +1,42 @@
+[
+  {
+    "role": "assistant",
+    "text": "Hello Abbu, it's Ayesha. How are you today?",
+    "at": "2026-10-29T10:00:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Not so good, beta. I slipped in the bathroom this morning and fell down.",
+    "at": "2026-10-29T10:01:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "Oh no, Abbu. Are you hurt?",
+    "at": "2026-10-29T10:02:00Z"
+  },
+  {
+    "role": "user",
+    "text": "My hip hurts a lot and I can hardly stand up. I hit my head on the sink also.",
+    "at": "2026-10-29T10:03:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "That worries me. Is anyone with you at home?",
+    "at": "2026-10-29T10:04:00Z"
+  },
+  {
+    "role": "user",
+    "text": "No, I am alone. I am lying on the sofa now, I cannot walk properly.",
+    "at": "2026-10-29T10:05:00Z"
+  },
+  {
+    "role": "assistant",
+    "text": "Please stay still, I will make sure someone comes.",
+    "at": "2026-10-29T10:06:00Z"
+  },
+  {
+    "role": "user",
+    "text": "Yes, please. It hurts very much.",
+    "at": "2026-10-29T10:07:00Z"
+  }
+]
