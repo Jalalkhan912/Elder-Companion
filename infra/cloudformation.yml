@@ -13,9 +13,12 @@ Parameters:
     AllowedValues: ["true", "false"]
     Default: "true"
     Description: "false if the account already has the token.actions.githubusercontent.com provider."
-  GitHubRepo:
+  GitHubSubjectPrefix:
     Type: String
-    Default: Jalalkhan912/Elder-Companion
+    Default: repo:Jalalkhan912@118057500/Elder-Companion@1438437050
+    Description: >-
+      The repo part of GitHub's OIDC "sub" claim. This repo uses immutable subjects
+      (owner@id/repo@id); see `gh api repos/OWNER/REPO/actions/oidc/customization/sub`.
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
@@ -142,7 +145,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepo}:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub: !Sub ${GitHubSubjectPrefix}:ref:refs/heads/main
       Policies:
         - PolicyName: deploy
           PolicyDocument:
