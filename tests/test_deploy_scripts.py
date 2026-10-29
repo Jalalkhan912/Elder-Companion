@@ -41,3 +41,10 @@ def test_write_env_excludes_site_and_requires_all():
     assert "LIVEKIT_URL=v-LIVEKIT_URL" in ok.stdout and "DB_PATH=/data/companion.db" in ok.stdout
     bad = run_write_env(full.replace("/elder/RESEND_API_KEY\tv-RESEND_API_KEY\n", ""))
     assert bad.returncode == 1 and "missing: RESEND_API_KEY" in bad.stderr
+
+
+def test_write_env_records_image_for_later_compose_commands():
+    full = "".join(f"/elder/{k}\tv-{k}\n" for k in APP_VARS)
+    out = _bash("IMAGE=repo/ec:abc123 write_env", full)
+    assert out.returncode == 0, out.stderr
+    assert "IMAGE=repo/ec:abc123" in out.stdout.splitlines()

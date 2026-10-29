@@ -20,6 +20,7 @@ render_caddyfile() {
 
 # write_env: "/elder/NAME<TAB>VALUE" lines on stdin -> "NAME=VALUE" lines on stdout.
 # Leaves out the SITE_* values and fails if an app variable is missing or empty.
+# Also records IMAGE, so later manual `docker compose ...` commands in /opt/elder work.
 write_env() {
   local path value name lines="" seen=" "
   while IFS=$'\t' read -r path value || [[ -n "$path" ]]; do
@@ -37,6 +38,7 @@ write_env() {
   done
   printf '%s' "$lines"
   echo "DB_PATH=/data/companion.db"
+  if [[ -n "${IMAGE:-}" ]]; then echo "IMAGE=$IMAGE"; fi
 }
 
 # param_value NAME < parameters -> value of /elder/NAME
