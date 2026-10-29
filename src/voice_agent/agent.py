@@ -43,12 +43,24 @@ from voice_agent.transcript import TranscriptRecorder
 
 log = logging.getLogger(__name__)
 
+CALL_ENDED_ATTRIBUTE = "companion.call_ended"
+
+
+async def mark_call_ended(job: JobContext) -> None:
+    """Tell the talk page the agent closed the call. Never raises or blocks for long."""
+    try:
+        await asyncio.wait_for(
+            job.room.local_participant.set_attributes({CALL_ENDED_ATTRIBUTE: "true"}), timeout=3)
+    except Exception:
+        log.exception("could not set the %s attribute", CALL_ENDED_ATTRIBUTE)
+
 
 class CompanionAgent(Agent):
     def __init__(self, instructions: str) -> None:
         super().__init__(instructions=instructions)
         # Why the call ended; read by the entrypoint's shutdown callback.
         self.end_reason: str | None = None
+        self._end_task: asyncio.Task | None = None
 
     @function_tool
     async def end_conversation(self, context: RunContext) -> None:
@@ -57,10 +69,14 @@ class CompanionAgent(Agent):
             self.end_reason = "goodbye"
         session = context.session
 
+        async def _end_job(job: JobContext) -> None:
+            await mark_call_ended(job)
+            job.shutdown(reason="goodbye")
+
         def _shutdown_after_speech(_handle: object) -> None:
             job = get_job_context(required=False)
             if job is not None:
-                job.shutdown(reason="goodbye")
+                self._end_task = asyncio.create_task(_end_job(job))
             else:  # e.g. text-only test sessions with no job
                 session.shutdown()
 
@@ -136,6 +152,7 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception:
             log.exception("goodbye reply failed")
         finally:
+            await mark_call_ended(ctx)
             ctx.shutdown(reason=reason)
 
     async def _time_limit() -> None:

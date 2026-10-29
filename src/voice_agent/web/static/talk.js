@@ -67,8 +67,24 @@
             document.body.appendChild(el);
           }
         });
+        var sawEnded = false;
+        function agentEnded(p) {
+          return !!(p.attributes && p.attributes["companion.call_ended"] === "true");
+        }
+        // The agent closed the call (goodbye / silence / time limit): a normal end, no retry.
+        function endByAgent() {
+          if (room !== r) return;
+          sawEnded = true;
+          userEnded = true;
+          stopTimer();
+          if (inCall) { btn.disabled = true; r.disconnect(); return; } // Disconnected -> idle
+          done = true; room = null; attempt = 0;
+          try { r.disconnect(); } catch (e) {}
+          idle(); setStatus("");
+        }
         function onAgent(p) {
           if (room !== r || !isAgent(p)) return;
+          if (agentEnded(p)) { endByAgent(); return; }
           stopTimer();
           if (!done) { done = true; inCall = true; attempt = 0; userEnded = false;
             btn.disabled = false; btn.classList.add("in-call"); btn.textContent = "End"; }
@@ -76,6 +92,12 @@
         }
         r.on(E.ParticipantConnected, onAgent);
         r.on(E.ParticipantAttributesChanged, function (changed, p) { onAgent(p); });
+        r.on(E.ParticipantDisconnected, function (p) {
+          if (room !== r || !isAgent(p)) return;
+          if (sawEnded || agentEnded(p)) { endByAgent(); return; }
+          // agent vanished without ending the call: a connection drop -> retry once
+          if (inCall) { r.disconnect(); }
+        });
         r.on(E.Disconnected, function () {
           if (room !== r) return; // superseded attempt: ignore
           room = null;
