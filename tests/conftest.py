@@ -1,6 +1,7 @@
 """Shared pytest fixtures (extended by later tasks)."""
 import pytest
 
+from voice_agent.config import load_settings
 from voice_agent.db import Database
 from voice_agent.models import Profile
 
@@ -10,6 +11,14 @@ def db(tmp_path):
     database = Database(tmp_path / "t.db")
     database.init_schema()
     return database
+
+
+@pytest.fixture
+def settings():
+    return load_settings({
+        "LIVEKIT_URL": "wss://x.livekit.cloud", "LIVEKIT_API_KEY": "k",
+        "LIVEKIT_API_SECRET": "s" * 32, "RESEND_API_KEY": "r", "EMAIL_FROM": "a@b.com",
+    })
 
 
 @pytest.fixture
