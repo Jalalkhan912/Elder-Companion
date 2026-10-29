@@ -117,3 +117,19 @@ def test_last_daily_sent_at(db):
     got = db.last_daily_sent_at()
     assert got.tzinfo is not None
     assert abs(datetime.now(timezone.utc) - got) < timedelta(seconds=10)
+
+
+def test_two_connections_send_once_and_no_lock_left_behind(tmp_path):
+    from voice_agent.db import Database
+    a = Database(tmp_path / "shared.db")
+    a.init_schema()
+    b = Database(tmp_path / "shared.db")
+    r = ["a@example.com"]
+    assert isinstance(a.claim_email("urgent", r, conversation_id=1), int)
+    assert b.claim_email("urgent", r, conversation_id=1) is None
+    assert not b._conn.in_transaction
+    # the other process can still write after the duplicate claim
+    assert isinstance(a.claim_email("urgent", r, conversation_id=2), int)
+    assert isinstance(b.claim_email("daily", r, period_date=date(2026, 10, 29)), int)
+    assert a.claim_email("daily", r, period_date=date(2026, 10, 29)) is None
+    assert isinstance(b.create_conversation("r", T0), int)

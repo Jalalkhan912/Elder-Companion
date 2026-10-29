@@ -1,6 +1,7 @@
 """SQLite repository shared by the LiveKit worker and the web backend."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from datetime import date, datetime, timezone
@@ -18,7 +19,15 @@ _WARNINGS = TypeAdapter(list[WarningItem])
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    data TEXT NOT NULL,
+    parent_name TEXT NOT NULL,
+    parent_nickname TEXT NOT NULL,
+    agent_role TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    personal_details TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'en',
+    child_emails TEXT NOT NULL,
+    summary_time TEXT NOT NULL,
+    timezone TEXT NOT NULL,
     pin_hash TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -37,7 +46,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     warnings TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_conv_ended ON conversations(ended_at);
-CREATE TABLE IF NOT EXISTS emails (
+CREATE TABLE IF NOT EXISTS email_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL CHECK (kind IN ('urgent', 'daily')),
     conversation_id INTEGER,
@@ -49,9 +58,9 @@ CREATE TABLE IF NOT EXISTS emails (
     sent_at TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_urgent
-    ON emails(conversation_id) WHERE kind = 'urgent';
+    ON email_log(conversation_id) WHERE kind = 'urgent';
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_daily
-    ON emails(period_date) WHERE kind = 'daily';
+    ON email_log(period_date) WHERE kind = 'daily';
 """
 
 
@@ -92,8 +101,12 @@ class Database:
 
     def _exec(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
         with self._lock:
-            cur = self._conn.execute(sql, params)
-            self._conn.commit()
+            try:
+                cur = self._conn.execute(sql, params)
+                self._conn.commit()
+            except BaseException:
+                self._conn.rollback()
+                raise
             return cur
 
     def _query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
@@ -102,8 +115,16 @@ class Database:
 
     # ---- profile ----
     def get_profile(self) -> Profile | None:
-        rows = self._query("SELECT data FROM profile WHERE id = 1")
-        return Profile.model_validate_json(rows[0]["data"]) if rows else None
+        rows = self._query("SELECT * FROM profile WHERE id = 1")
+        if not rows:
+            return None
+        r = rows[0]
+        return Profile(
+            parent_name=r["parent_name"], parent_nickname=r["parent_nickname"],
+            agent_role=r["agent_role"], agent_name=r["agent_name"],
+            personal_details=r["personal_details"], language=r["language"],
+            child_emails=json.loads(r["child_emails"]),
+            summary_time=r["summary_time"], timezone=r["timezone"])
 
     def get_pin_hash(self) -> str | None:
         rows = self._query("SELECT pin_hash FROM profile WHERE id = 1")
@@ -112,13 +133,26 @@ class Database:
     def save_profile(self, profile: Profile, pin_hash: str | None) -> None:
         now = _now()
         self._exec(
-            """INSERT INTO profile (id, data, pin_hash, created_at, updated_at)
-               VALUES (1, ?, ?, ?, ?)
+            """INSERT INTO profile (id, parent_name, parent_nickname, agent_role,
+                 agent_name, personal_details, language, child_emails, summary_time,
+                 timezone, pin_hash, created_at, updated_at)
+               VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
-                 data = excluded.data,
+                 parent_name = excluded.parent_name,
+                 parent_nickname = excluded.parent_nickname,
+                 agent_role = excluded.agent_role,
+                 agent_name = excluded.agent_name,
+                 personal_details = excluded.personal_details,
+                 language = excluded.language,
+                 child_emails = excluded.child_emails,
+                 summary_time = excluded.summary_time,
+                 timezone = excluded.timezone,
                  pin_hash = COALESCE(excluded.pin_hash, profile.pin_hash),
                  updated_at = excluded.updated_at""",
-            (profile.model_dump_json(), pin_hash, now, now),
+            (profile.parent_name, profile.parent_nickname, profile.agent_role,
+             profile.agent_name, profile.personal_details, profile.language,
+             json.dumps(list(profile.child_emails)), profile.summary_time,
+             profile.timezone, pin_hash, now, now),
         )
 
     # ---- conversations ----
@@ -208,7 +242,7 @@ class Database:
                     period_date: date | None = None) -> int | None:
         try:
             cur = self._exec(
-                """INSERT INTO emails (kind, conversation_id, period_date, recipients,
+                """INSERT INTO email_log (kind, conversation_id, period_date, recipients,
                    status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)""",
                 (kind, conversation_id,
                  period_date.isoformat() if period_date else None,
@@ -221,10 +255,10 @@ class Database:
     def mark_email(self, email_id: int, status: Literal["sent", "failed"],
                    error: str | None = None) -> None:
         sent_at = _now() if status == "sent" else None
-        self._exec("UPDATE emails SET status = ?, error = ?, sent_at = ? WHERE id = ?",
+        self._exec("UPDATE email_log SET status = ?, error = ?, sent_at = ? WHERE id = ?",
                    (status, error, sent_at, email_id))
 
     def last_daily_sent_at(self) -> datetime | None:
         rows = self._query(
-            "SELECT MAX(sent_at) AS m FROM emails WHERE kind = 'daily' AND status = 'sent'")
+            "SELECT MAX(sent_at) AS m FROM email_log WHERE kind = 'daily' AND status = 'sent'")
         return _parse(rows[0]["m"])
