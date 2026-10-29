@@ -19,12 +19,103 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest
 
-  build-check:
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_URI: ${{ vars.ECR_URI }}
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+      SITE_HOST: ${{ vars.SITE_HOST }}
     steps:
+      - name: check-secrets
+        env:
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SITE_USER: ${{ secrets.SITE_USER }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          failed=0
+          for n in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET RESEND_API_KEY EMAIL_FROM SITE_USER SITE_PASSWORD; do
+            if [ -z "${!n}" ]; then echo "missing secret: $n"; failed=1; fi
+          done
+          exit $failed
+
       - uses: actions/checkout@v4
-      - run: docker build -t ec:test .
-      - run: docker run --rm ec:test python -c "import voice_agent.agent, voice_agent.web.app, onnxruntime"
-      - name: runs as uid 1000 and /data is writable
-        run: test "$(docker run --rm ec:test sh -c 'id -u && test -w /data')" = "1000"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          docker build -t "$ECR_URI:$GITHUB_SHA" .
+          docker push "$ECR_URI:$GITHUB_SHA"
+
+      - name: Sync secrets to SSM Parameter Store
+        env:
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SITE_USER: ${{ secrets.SITE_USER }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          for n in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET RESEND_API_KEY EMAIL_FROM SITE_USER SITE_PASSWORD; do
+            aws ssm put-parameter --name "/elder/$n" --type SecureString --overwrite \
+              --value "${!n}" > /dev/null
+            echo "synced /elder/$n"
+          done
+
+      - name: Deploy on the server
+        run: |
+          bundle=$(tar -czf - -C deploy . | base64 -w0)
+          jq -n --arg b "$bundle" \
+            --arg run "cd /opt/elder && IMAGE=$ECR_URI:$GITHUB_SHA SITE_HOST=$SITE_HOST AWS_REGION=$AWS_REGION bash server-deploy.sh" \
+            '{commands: ["set -e", "mkdir -p /opt/elder", "echo \($b) | base64 -d | tar -xz -C /opt/elder", $run],
+              executionTimeout: ["900"]}' > params.json
+          cid=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
+            --comment "deploy $GITHUB_SHA" --parameters file://params.json \
+            --query Command.CommandId --output text)
+          echo "command $cid"
+          for i in $(seq 1 60); do
+            sleep 10
+            status=$(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            echo "status: $status"
+            case "$status" in Pending|InProgress|Delayed) continue ;; esac
+            break
+          done
+          aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent,StandardErrorContent]' --output text
+          [ "$status" = Success ]
+
+      - name: Smoke test
+        env:
+          SITE_USER: ${{ secrets.SITE_USER }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          ok=0
+          for i in $(seq 1 36); do
+            if curl -fsS -u "$SITE_USER:$SITE_PASSWORD" "https://$SITE_HOST/api/status"; then ok=1; break; fi
+            echo " ...waiting for HTTPS ($i)"; sleep 5
+          done
+          [ "$ok" = 1 ] || { echo "site did not answer with valid HTTPS in 3 minutes"; exit 1; }
+          echo
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$SITE_HOST/api/status")
+          echo "without credentials: $code"
+          [ "$code" = 401 ]
