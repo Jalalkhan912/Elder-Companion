@@ -18,3 +18,13 @@ jobs:
           version: "0.12.17"
       - run: uv sync --frozen
       - run: uv run pytest
+
+  build-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ec:test .
+      - run: docker run --rm ec:test python -c "import voice_agent.agent, voice_agent.web.app, onnxruntime"
+      - name: runs as uid 1000 and /data is writable
+        run: test "$(docker run --rm ec:test sh -c 'id -u && test -w /data')" = "1000"
