@@ -7,8 +7,7 @@
   var room = null;
   var inCall = false;
   var attempt = 0;
-  var agentTimer = null;
-  var failed = false;
+  var userEnded = false;
 
   function setStatus(t) { statusEl.textContent = t; }
   function idle() {
@@ -17,7 +16,6 @@
     btn.classList.remove("in-call");
     btn.textContent = "Talk to " + agentName;
   }
-  function clearTimer() { if (agentTimer) { clearTimeout(agentTimer); agentTimer = null; } }
 
   function agentLabel(state) {
     if (state === "listening") return agentName + " is listening";
@@ -36,28 +34,23 @@
     if (l) setStatus(l);
   }
 
-  function fail(r) {
-    clearTimer();
-    if (r) { try { r.disconnect(); } catch (e) {} }
-    if (room === r) room = null;
-  }
-
   function startAttempt() {
     attempt += 1;
-    failed = false;
     btn.disabled = true;
-    setStatus("Connecting…");
+    setStatus("Connecting\u2026");
     var r = null;
     var done = false;
+    var timer = null;
+    function stopTimer() { if (timer) { clearTimeout(timer); timer = null; } }
     function giveUp() {
       if (done) return;
       done = true;
-      failed = true;
-      fail(r);
+      stopTimer();
+      if (r) { var old = r; if (room === old) room = null; try { old.disconnect(); } catch (e) {} }
       if (attempt < 2) { startAttempt(); return; }
       attempt = 0;
       idle();
-      setStatus("Couldn’t connect — tap to try again");
+      setStatus("Couldn\u2019t connect \u2014 tap to try again");
     }
     fetch("/api/token", { method: "POST" })
       .then(function (res) { if (!res.ok) throw new Error("token " + res.status); return res.json(); })
@@ -67,6 +60,7 @@
         room = r;
         var E = LivekitClient.RoomEvent;
         r.on(E.TrackSubscribed, function (track) {
+          if (room !== r) return;
           if (track.kind === "audio") {
             var el = track.attach();
             el.autoplay = true;
@@ -74,21 +68,28 @@
           }
         });
         function onAgent(p) {
-          if (!isAgent(p)) return;
-          clearTimer();
-          if (!done) { done = true; inCall = true; attempt = 0;
+          if (room !== r || !isAgent(p)) return;
+          stopTimer();
+          if (!done) { done = true; inCall = true; attempt = 0; userEnded = false;
             btn.disabled = false; btn.classList.add("in-call"); btn.textContent = "End"; }
           updateFromAgent(p);
         }
         r.on(E.ParticipantConnected, onAgent);
         r.on(E.ParticipantAttributesChanged, function (changed, p) { onAgent(p); });
         r.on(E.Disconnected, function () {
-          clearTimer();
-          if (room === r) room = null;
-          if (inCall) { idle(); setStatus(""); }
-          else if (!done) { giveUp(); }
+          if (room !== r) return; // superseded attempt: ignore
+          room = null;
+          stopTimer();
+          if (inCall) {
+            inCall = false;
+            if (userEnded) { idle(); setStatus(""); return; }
+            // connection dropped mid-call: retry once automatically
+            attempt = 1;
+            btn.classList.remove("in-call");
+            startAttempt();
+          } else if (!done) { giveUp(); }
         });
-        agentTimer = setTimeout(giveUp, 15000);
+        timer = setTimeout(giveUp, 15000);
         return r.connect(t.url, t.token)
           .then(function () { return r.localParticipant.setMicrophoneEnabled(true); })
           .then(function () {
@@ -101,10 +102,12 @@
   btn.addEventListener("click", function () {
     if (inCall) {
       btn.disabled = true;
+      userEnded = true;
       if (room) { room.disconnect(); } else { idle(); setStatus(""); }
       return;
     }
     attempt = 0;
+    userEnded = false;
     startAttempt();
   });
 
