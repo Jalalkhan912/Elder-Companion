@@ -1,1 +1,41 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Setup</title></head><body>Placeholder</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<form id="unlock-form" hidden>
+  <h1>Enter your PIN</h1>
+  <label>PIN <input id="unlock-pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+  <p class="error" id="unlock-error" role="alert"></p>
+  <button class="primary" type="submit">Unlock</button>
+</form>
+<form id="setup-form" hidden>
+  <h1>Setup</h1>
+  <label>Parent's full name <input id="parent_name" required></label>
+  <label>What the parent likes to be called <input id="parent_nickname" required></label>
+  <label>Companion plays the role of
+    <select id="agent_role">
+      <option value="son">Son</option>
+      <option value="daughter">Daughter</option>
+      <option value="friend">Friend</option>
+      <option value="companion">Companion</option>
+    </select></label>
+  <label>Companion's name <input id="agent_name" required></label>
+  <label>Things to know about your parent <span class="hint">(family, hobbies, health routines, favourite topics)</span>
+    <textarea id="personal_details"></textarea></label>
+  <label>Your email addresses <span class="hint">(separate several with commas)</span>
+    <input id="child_emails" type="text" inputmode="email" required></label>
+  <label>Daily summary time <input id="summary_time" type="time" value="20:00" required></label>
+  <label>Time zone <input id="timezone" required></label>
+  <label id="pin-label">PIN <span class="hint" id="pin-hint">(4 to 8 digits)</span>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" required></label>
+  <p class="error" id="setup-error" role="alert"></p>
+  <button class="primary" id="save-btn" type="submit">Save</button>
+</form>
+<script src="/static/setup.js"></script>
+</body>
+</html>

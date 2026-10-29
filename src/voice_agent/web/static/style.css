@@ -1,0 +1,24 @@
+:root { --bg:#fffdf7; --fg:#111; --accent:#0b3d91; --accent-fg:#fff; --end:#7a1010; }
+* { box-sizing: border-box; }
+html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:20px; line-height:1.4; }
+body { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
+.talk { gap:4vmin; }
+#talk-btn { width:60vmin; height:60vmin; min-width:240px; min-height:240px; border-radius:50%; border:0;
+  background:var(--accent); color:var(--accent-fg); font-size:max(36px, 6vmin); font-weight:700; padding:4vmin;
+  cursor:pointer; }
+#talk-btn.in-call { background:var(--end); }
+#talk-btn:disabled { opacity:.75; cursor:default; }
+#talk-btn:focus-visible, a:focus-visible, button:focus-visible { outline:6px solid #000; outline-offset:4px; }
+#status { font-size:max(32px, 4.5vmin); min-height:2.6em; text-align:center; margin:0; font-weight:600; }
+.settings-link { position:fixed; right:16px; bottom:12px; color:var(--fg); font-size:20px; }
+form { width:100%; max-width:640px; display:flex; flex-direction:column; gap:14px; }
+h1 { font-size:34px; margin:0 0 8px; }
+label { font-weight:600; display:flex; flex-direction:column; gap:4px; }
+input, select, textarea { font:inherit; padding:12px; border:2px solid var(--fg); border-radius:8px; background:#fff; color:var(--fg); }
+textarea { min-height:120px; }
+.hint { font-weight:400; font-size:16px; }
+button.primary { font:inherit; font-weight:700; padding:16px; border:0; border-radius:10px; background:var(--accent); color:var(--accent-fg); cursor:pointer; }
+button.primary:disabled { opacity:.7; }
+.error { color:#8a0000; font-weight:700; min-height:1.4em; margin:0; }
+[hidden] { display:none !important; }
