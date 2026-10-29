@@ -38,3 +38,18 @@ class FakeLLM:
         if isinstance(self.reply, Exception):
             raise self.reply
         return self.reply
+
+
+class FakeSender:
+    """EmailSender test double: fails the first `fail_times` calls, then records."""
+
+    def __init__(self, fail_times: int = 0):
+        self.fail_times = fail_times
+        self.calls = 0
+        self.sent: list[tuple[list[str], str, str]] = []
+
+    async def __call__(self, to: list[str], subject: str, html: str) -> None:
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise RuntimeError(f"boom {self.calls}")
+        self.sent.append((to, subject, html))
