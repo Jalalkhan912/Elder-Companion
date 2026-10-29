@@ -1,0 +1,32 @@
+name: elder
+
+x-app: &app
+  image: ${IMAGE}
+  env_file: .env
+  volumes:
+    - appdata:/data
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+
+  agent:
+    <<: *app
+    command: ["python", "-m", "voice_agent.agent", "start"]
+
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  appdata:
+  caddy_data:
+  caddy_config:

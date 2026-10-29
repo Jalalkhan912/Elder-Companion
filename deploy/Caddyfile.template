@@ -1,0 +1,6 @@
+__SITE_HOST__ {
+	basic_auth {
+		__SITE_USER__ __SITE_HASH__
+	}
+	reverse_proxy web:8000
+}
