@@ -24,3 +24,17 @@ def profile():
         summary_time="20:00",
         timezone="Asia/Karachi",
     )
+
+
+class FakeLLM:
+    """TextLLM test double. Tests construct it directly: `from conftest import FakeLLM`."""
+
+    def __init__(self, reply: "str | Exception"):
+        self.reply = reply
+        self.calls: list[tuple[str, str]] = []
+
+    async def complete(self, system: str, user: str) -> str:
+        self.calls.append((system, user))
+        if isinstance(self.reply, Exception):
+            raise self.reply
+        return self.reply
