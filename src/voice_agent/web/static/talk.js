@@ -9,7 +9,20 @@
   var attempt = 0;
   var userEnded = false;
 
+  var INSECURE_MSG = "This page needs a secure https:// link to use the microphone. " +
+    "Please ask your family to check the setup.";
+  var MIC_MSG = "Please allow the microphone, then tap to try again.";
+
   function setStatus(t) { statusEl.textContent = t; }
+  // Browsers only allow the microphone on https:// pages (or localhost).
+  function micUnavailable() {
+    return !window.isSecureContext || !navigator.mediaDevices ||
+      !navigator.mediaDevices.getUserMedia;
+  }
+  function isMicError(e) {
+    var n = e && e.name;
+    return n === "NotAllowedError" || n === "NotFoundError" || n === "SecurityError";
+  }
   function idle() {
     inCall = false;
     btn.disabled = false;
@@ -51,6 +64,18 @@
       attempt = 0;
       idle();
       setStatus("Couldn\u2019t connect \u2014 tap to try again");
+    }
+    // Mic denied or missing: retrying cannot help, so stop and ask (no auto-retry).
+    function micFailed() {
+      if (room !== r) return; // this attempt was already given up or superseded
+      done = true;
+      stopTimer();
+      room = null; // our Disconnected handler now ignores this room
+      inCall = false;
+      attempt = 0;
+      try { r.disconnect(); } catch (e) {}
+      idle();
+      setStatus(MIC_MSG);
     }
     fetch("/api/token", { method: "POST" })
       .then(function (res) { if (!res.ok) throw new Error("token " + res.status); return res.json(); })
@@ -113,9 +138,13 @@
         });
         timer = setTimeout(giveUp, 15000);
         return r.connect(t.url, t.token)
-          .then(function () { return r.localParticipant.setMicrophoneEnabled(true); })
           .then(function () {
-            r.remoteParticipants.forEach(function (p) { onAgent(p); });
+            return r.localParticipant.setMicrophoneEnabled(true).then(function () {
+              r.remoteParticipants.forEach(function (p) { onAgent(p); });
+            }, function (e) {
+              if (isMicError(e)) { micFailed(); return; }
+              throw e;
+            });
           });
       })
       .catch(function () { giveUp(); });
@@ -128,6 +157,7 @@
       if (room) { room.disconnect(); } else { idle(); setStatus(""); }
       return;
     }
+    if (micUnavailable()) { setStatus(INSECURE_MSG); return; }
     attempt = 0;
     userEnded = false;
     startAttempt();
@@ -137,5 +167,6 @@
     if (!s.configured) { window.location.href = "/setup"; return; }
     agentName = s.agent_name;
     idle();
+    if (micUnavailable()) setStatus(INSECURE_MSG);
   }).catch(function () { setStatus("Couldn’t load. Please reload."); });
 })();

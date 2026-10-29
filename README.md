@@ -37,7 +37,28 @@ Terminal 2, the web backend:
 uv run uvicorn voice_agent.web.app:create_app_from_env --factory --host 0.0.0.0 --port 8000
 ```
 
-Then open `http://localhost:8000/setup` to choose a PIN and fill in the profile (names, child emails, summary time, time zone), and give the parent `http://<this-machine>:8000/talk` (the talk page).
+Then, straight after the first start, open `http://localhost:8000/setup` to choose a PIN and fill in the profile (names, child emails, summary time, time zone). For testing on the same machine, `http://localhost:8000/talk` works as is. For the parent's tablet you need HTTPS (next section).
+
+### HTTPS for the tablet
+
+Browsers only allow the microphone on `https://` pages or on `localhost`. Over plain `http://<lan-ip>:8000` the talk page shows "This page needs a secure https:// link…" and cannot start a call. Use [mkcert](https://github.com/FiloSottile/mkcert) to make a locally trusted certificate:
+
+```bash
+mkcert -install                         # creates a local root CA on this machine
+mkcert 192.168.1.20 localhost           # use this machine's LAN IP; writes 192.168.1.20+1.pem and 192.168.1.20+1-key.pem
+uv run uvicorn voice_agent.web.app:create_app_from_env --factory --host 192.168.1.20 --port 8000 \
+  --ssl-keyfile 192.168.1.20+1-key.pem --ssl-certfile 192.168.1.20+1.pem
+```
+
+Install mkcert's root CA (`mkcert -CAROOT` shows where `rootCA.pem` is) on the tablet and mark it trusted (iOS: install the profile, then Settings → General → About → Certificate Trust Settings; Android: Settings → Security → Install a certificate → CA certificate). Then give the parent `https://192.168.1.20:8000/talk`. If the parent denied the microphone, the page says "Please allow the microphone, then tap to try again"; allow it in the browser's site settings.
+
+### Security
+
+This is a prototype for a trusted home or care-home network. The token and setup endpoints are reachable by anyone who can reach the port (setup is PIN-protected, but until the first setup is saved whoever opens `/setup` first chooses the PIN; the token endpoint has no PIN). Bind to the specific LAN IP (as above) rather than `0.0.0.0` where you can, never expose the port to the internet, and do the setup immediately after the first start.
+
+### Daily email timing
+
+The daily email is sent once per local day, at or after `summary_time`. So if you save the setup after today's summary time, the first email ("… didn't talk with … today") goes out within a minute; and `00:00` sends at midnight, at the very start of the day. A failed daily send is retried each minute, up to 3 times.
 
 ## Tests
 
@@ -54,3 +75,7 @@ uv run pytest -m slow    # needs real LiveKit credentials: agent behaviour and a
 ## Forgotten PIN
 
 Stop both processes and delete `data/companion.db`. This also erases the profile and all stored conversations; set everything up again afterwards.
+
+## Schema changes
+
+There are no migrations during the prototype phase: after pulling a change to the database schema, stop both processes and delete `data/companion.db` to reset it (this erases all data, as above).
