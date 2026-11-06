@@ -7,7 +7,12 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="talk">
-<button id="talk-btn" type="button" disabled>Talk</button>
+<div class="orb" data-state="idle">
+  <span class="ring r1" aria-hidden="true"></span>
+  <span class="ring r2" aria-hidden="true"></span>
+  <span class="ring r3" aria-hidden="true"></span>
+  <button id="talk-btn" type="button" disabled>Talk</button>
+</div>
 <p id="status" role="status" aria-live="polite"></p>
 <a class="settings-link" href="/setup">settings</a>
 <audio id="audio-sink" autoplay></audio>

@@ -3,14 +3,14 @@
 html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:20px; line-height:1.4; }
 body { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
-.talk { gap:4vmin; }
-#talk-btn { width:60vmin; height:60vmin; min-width:240px; min-height:240px; border-radius:50%; border:0;
+.talk { gap:4vmin; overflow-x:hidden; }
+#talk-btn { position:relative; z-index:1; width:100%; height:100%; border-radius:50%; border:0;
   background:var(--accent); color:var(--accent-fg); font-size:max(36px, 6vmin); font-weight:700; padding:4vmin;
   cursor:pointer; }
 #talk-btn.in-call { background:var(--end); }
 #talk-btn:disabled { opacity:.75; cursor:default; }
 #talk-btn:focus-visible, a:focus-visible, button:focus-visible { outline:6px solid #000; outline-offset:4px; }
-#status { font-size:max(32px, 4.5vmin); min-height:2.6em; text-align:center; margin:0; font-weight:600; }
+#status { position:relative; z-index:1; font-size:max(32px, 4.5vmin); min-height:2.6em; text-align:center; margin:0; font-weight:600; }
 .settings-link { position:fixed; right:16px; bottom:12px; color:var(--fg); font-size:20px; }
 form { width:100%; max-width:640px; display:flex; flex-direction:column; gap:14px; }
 h1 { font-size:34px; margin:0 0 8px; }
@@ -22,3 +22,35 @@ button.primary { font:inherit; font-weight:700; padding:16px; border:0; border-r
 button.primary:disabled { opacity:.7; }
 .error { color:#8a0000; font-weight:700; min-height:1.4em; margin:0; }
 [hidden] { display:none !important; }
+
+/* Siri-like glow behind the talk button. JS sets data-state and --level (0..1, voice volume). */
+.orb { --level:0; --glow:var(--accent); position:relative; width:60vmin; height:60vmin;
+  min-width:240px; min-height:240px; margin:5vmin; }
+.orb.in-call { --glow:var(--end); }
+.ring { position:absolute; inset:0; border-radius:50%; pointer-events:none; filter:blur(12px);
+  opacity:.5; scale:1.06; transition:scale .15s linear, opacity .4s ease; }
+/* Off-center pivots make the rings drift as they turn, like a slow swirl. */
+.r1 { transform-origin:46% 54%; background:radial-gradient(circle at 30% 30%, var(--glow), transparent 70%); }
+.r2 { transform-origin:54% 47%; background:radial-gradient(circle at 72% 40%, var(--glow), transparent 70%); }
+.r3 { transform-origin:50% 45%; background:radial-gradient(circle at 45% 76%, var(--glow), transparent 70%); }
+@keyframes orb-spin { to { rotate:360deg; } }
+@keyframes orb-breathe { 0%, 100% { scale:1.03; opacity:.35; } 50% { scale:1.16; opacity:.7; } }
+@keyframes orb-shimmer { from { opacity:.3; } to { opacity:.7; } }
+.orb[data-state="idle"] .ring { animation:orb-breathe 4s ease-in-out infinite; }
+.orb[data-state="idle"] .r2 { animation-delay:-1.3s; }
+.orb[data-state="idle"] .r3 { animation-delay:-2.6s; }
+.orb[data-state="connecting"] .ring { scale:1.1; opacity:.55; animation:orb-spin 3s linear infinite; }
+.orb[data-state="connecting"] .r2 { animation-direction:reverse; animation-duration:4s; }
+.orb[data-state="thinking"] .ring { scale:1.08;
+  animation:orb-spin 4s linear infinite, orb-shimmer 1.6s ease-in-out infinite alternate; }
+.orb[data-state="thinking"] .r2 { animation-direction:reverse, alternate; }
+.orb[data-state="listening"] .ring,
+.orb[data-state="speaking"] .ring { animation:orb-spin 12s linear infinite; }
+.orb[data-state="speaking"] .ring { opacity:.6; animation-duration:8s; }
+.orb[data-state="listening"] .r2, .orb[data-state="speaking"] .r2 { animation-direction:reverse; }
+.orb[data-state="listening"] .r1, .orb[data-state="speaking"] .r1 { scale:calc(1.06 + var(--level) * .15); }
+.orb[data-state="listening"] .r2, .orb[data-state="speaking"] .r2 { scale:calc(1.06 + var(--level) * .22); }
+.orb[data-state="listening"] .r3, .orb[data-state="speaking"] .r3 { scale:calc(1.06 + var(--level) * .30); }
+@media (prefers-reduced-motion: reduce) {
+  .orb .ring { animation:none !important; transition:none; scale:1.08 !important; opacity:.5 !important; }
+}

@@ -108,3 +108,12 @@ def test_scheduler_starts_and_stops_with_app(db, settings):
     app = create_app(db, settings, FakeLLM("{}"), FakeSender(), start_scheduler=True)
     with TestClient(app) as c:
         assert c.get("/api/status").status_code == 200
+
+
+def test_talk_page_has_animated_orb(client):
+    html = client.get("/static/talk.html").text
+    assert 'class="orb"' in html and 'id="talk-btn"' in html
+    css = client.get("/static/style.css").text
+    assert "--level" in css and "prefers-reduced-motion" in css
+    js = client.get("/static/talk.js").text
+    assert "audioLevel" in js and "setOrb" in js
