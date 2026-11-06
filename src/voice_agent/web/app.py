@@ -47,6 +47,16 @@ def create_app(db: Database, settings: Settings, llm: TextLLM, sender: EmailSend
 
     app = FastAPI(lifespan=lifespan)
 
+    # Make browsers check for a newer page/script/style on each visit, so a deploy
+    # shows up right away. Unchanged files still come back as a cheap 304.
+    @app.middleware("http")
+    async def revalidate_pages(request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path in ("/talk", "/setup") or path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     def check_pin(pin: str, pin_hash: str) -> None:
         if lockout.is_locked():
             raise HTTPException(423, "Too many wrong tries. Try again later.")

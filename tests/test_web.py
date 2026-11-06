@@ -117,3 +117,12 @@ def test_talk_page_has_animated_orb(client):
     assert "--level" in css and "prefers-reduced-motion" in css
     js = client.get("/static/talk.js").text
     assert "audioLevel" in js and "setOrb" in js
+
+
+def test_pages_and_static_files_are_revalidated(client, profile):
+    # Browsers must check for new versions after a deploy instead of reusing old copies.
+    client.post("/api/setup", json=body(profile))
+    for path in ("/talk", "/setup", "/static/talk.html", "/static/style.css", "/static/talk.js"):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        assert r.headers.get("cache-control") == "no-cache", path
