@@ -3,15 +3,7 @@
 html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:20px; line-height:1.4; }
 body { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
-.talk { gap:4vmin; overflow-x:hidden; }
-#talk-btn { position:relative; z-index:1; width:100%; height:100%; border-radius:50%; border:0;
-  background:var(--accent); color:var(--accent-fg); font-size:max(36px, 6vmin); font-weight:700; padding:4vmin;
-  cursor:pointer; }
-#talk-btn.in-call { background:var(--end); }
-#talk-btn:disabled { opacity:.75; cursor:default; }
-#talk-btn:focus-visible, a:focus-visible, button:focus-visible { outline:6px solid #000; outline-offset:4px; }
-#status { position:relative; z-index:1; font-size:max(32px, 4.5vmin); min-height:2.6em; text-align:center; margin:0; font-weight:600; }
-.settings-link { position:fixed; right:16px; bottom:12px; color:var(--fg); font-size:20px; }
+a:focus-visible, button:focus-visible { outline:6px solid #000; outline-offset:4px; }
 form { width:100%; max-width:640px; display:flex; flex-direction:column; gap:14px; }
 h1 { font-size:34px; margin:0 0 8px; }
 label { font-weight:600; display:flex; flex-direction:column; gap:4px; }
@@ -23,34 +15,95 @@ button.primary:disabled { opacity:.7; }
 .error { color:#8a0000; font-weight:700; min-height:1.4em; margin:0; }
 [hidden] { display:none !important; }
 
-/* Siri-like glow behind the talk button. JS sets data-state and --level (0..1, voice volume). */
-.orb { --level:0; --glow:var(--accent); position:relative; width:60vmin; height:60vmin;
-  min-width:240px; min-height:240px; margin:5vmin; }
-.orb.in-call { --glow:var(--end); }
-.ring { position:absolute; inset:0; border-radius:50%; pointer-events:none; filter:blur(12px);
-  opacity:.5; scale:1.06; transition:scale .15s linear, opacity .4s ease; }
-/* Off-center pivots make the rings drift as they turn, like a slow swirl. */
-.r1 { transform-origin:46% 54%; background:radial-gradient(circle at 30% 30%, var(--glow), transparent 70%); }
-.r2 { transform-origin:54% 47%; background:radial-gradient(circle at 72% 40%, var(--glow), transparent 70%); }
-.r3 { transform-origin:50% 45%; background:radial-gradient(circle at 45% 76%, var(--glow), transparent 70%); }
-@keyframes orb-spin { to { rotate:360deg; } }
-@keyframes orb-breathe { 0%, 100% { scale:1.03; opacity:.35; } 50% { scale:1.16; opacity:.7; } }
-@keyframes orb-shimmer { from { opacity:.3; } to { opacity:.7; } }
-.orb[data-state="idle"] .ring { animation:orb-breathe 4s ease-in-out infinite; }
-.orb[data-state="idle"] .r2 { animation-delay:-1.3s; }
-.orb[data-state="idle"] .r3 { animation-delay:-2.6s; }
-.orb[data-state="connecting"] .ring { scale:1.1; opacity:.55; animation:orb-spin 3s linear infinite; }
-.orb[data-state="connecting"] .r2 { animation-direction:reverse; animation-duration:4s; }
-.orb[data-state="thinking"] .ring { scale:1.08;
-  animation:orb-spin 4s linear infinite, orb-shimmer 1.6s ease-in-out infinite alternate; }
-.orb[data-state="thinking"] .r2 { animation-direction:reverse, alternate; }
-.orb[data-state="listening"] .ring,
-.orb[data-state="speaking"] .ring { animation:orb-spin 12s linear infinite; }
-.orb[data-state="speaking"] .ring { opacity:.6; animation-duration:8s; }
-.orb[data-state="listening"] .r2, .orb[data-state="speaking"] .r2 { animation-direction:reverse; }
-.orb[data-state="listening"] .r1, .orb[data-state="speaking"] .r1 { scale:calc(1.06 + var(--level) * .15); }
-.orb[data-state="listening"] .r2, .orb[data-state="speaking"] .r2 { scale:calc(1.06 + var(--level) * .22); }
-.orb[data-state="listening"] .r3, .orb[data-state="speaking"] .r3 { scale:calc(1.06 + var(--level) * .30); }
+/* ---- Talk screen: warm aurora behind a glass button, Apple-style motion.
+   JS sets data-state on .orb and --level (0..1, voice volume). ---- */
+.talk { --bg:#FBF7F2; --fg:#1C1C1E; --muted:#6E6E73; --end:#E5342A; --spring:cubic-bezier(.34,1.56,.64,1);
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+  justify-content:flex-start; padding:0; overflow-x:hidden; }
+.talk a:focus-visible, .talk button:focus-visible { outline:4px solid #0A84FF; outline-offset:4px; }
+.talk-head { width:100%; max-width:760px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+  padding:max(28px, env(safe-area-inset-top)) 24px 0; }
+.date-line { margin:0; font-size:18px; font-weight:600; color:var(--muted); }
+.greeting { margin:4px 0 0; font-size:clamp(30px, 6vw, 44px); font-weight:700; letter-spacing:-.02em; line-height:1.1; }
+.settings-btn { flex:none; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:rgba(118,118,128,.12); color:var(--fg); }
+.talk-main { flex:1; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2vh; padding:16px 16px 48px; }
+
+.orb { --level:0; --s:clamp(270px, min(86vw, 54vh), 460px); position:relative; width:var(--s); height:var(--s);
+  display:flex; align-items:center; justify-content:center; }
+
+/* The aura: four colour glows drifting inside a slowly morphing, rotating shape. */
+.aura-scale { position:absolute; inset:0; pointer-events:none; scale:.9; transition:scale .18s var(--spring); }
+.aura { position:absolute; inset:6%; overflow:hidden; filter:blur(20px) saturate(1.15);
+  animation:aura-morph 16s ease-in-out infinite, aura-rot 48s linear infinite; }
+.glow { position:absolute; width:75%; height:75%; border-radius:50%; mix-blend-mode:multiply; }
+.g1 { left:-5%; top:0; background:radial-gradient(circle, #BC82F3 0%, rgba(188,130,243,0) 70%); animation:drift-a 9s ease-in-out infinite; }
+.g2 { right:-8%; top:8%; background:radial-gradient(circle, #FF6778 0%, rgba(255,103,120,0) 70%); animation:drift-b 11s ease-in-out infinite; }
+.g3 { left:18%; bottom:-10%; background:radial-gradient(circle, #FFBA71 0%, rgba(255,186,113,0) 70%); animation:drift-a 13s ease-in-out infinite reverse; }
+.g4 { left:30%; top:22%; width:55%; height:55%; background:radial-gradient(circle, #8D9FFF 0%, rgba(141,159,255,0) 70%); animation:drift-b 8s ease-in-out infinite reverse; }
+@keyframes aura-morph {
+  0%, 100% { border-radius:42% 58% 63% 37% / 41% 44% 56% 59%; }
+  33% { border-radius:61% 39% 45% 55% / 55% 62% 38% 45%; }
+  66% { border-radius:38% 62% 56% 44% / 62% 38% 62% 38%; } }
+@keyframes aura-rot { to { transform:rotate(360deg); } }
+@keyframes drift-a { 0%, 100% { transform:translate(0,0) scale(1); } 50% { transform:translate(18%,12%) scale(1.15); } }
+@keyframes drift-b { 0%, 100% { transform:translate(0,0) scale(1.05); } 50% { transform:translate(-16%,14%) scale(.9); } }
+@keyframes aura-hue { from { filter:blur(20px) saturate(1.3) hue-rotate(0deg); } to { filter:blur(20px) saturate(1.3) hue-rotate(40deg); } }
+.orb[data-state="idle"] .aura { opacity:.8; }
+.orb[data-state="connecting"] .aura-scale { scale:.94; }
+.orb[data-state="listening"] .aura, .orb[data-state="speaking"] .aura { animation-duration:10s, 26s; }
+.orb[data-state="listening"] .aura-scale { scale:calc(.95 + var(--level) * .16); }
+.orb[data-state="speaking"] .aura-scale { scale:calc(.95 + var(--level) * .24); }
+.orb[data-state="thinking"] .aura-scale { scale:.88; }
+.orb[data-state="thinking"] .aura { animation:aura-morph 3s ease-in-out infinite, aura-rot 5s linear infinite, aura-hue 1.6s ease-in-out infinite alternate; }
+
+/* Rings flow inward while listening and outward while speaking. */
+.rip { position:absolute; inset:20%; border-radius:50%; border:2px solid #8D9FFF; opacity:0; pointer-events:none; }
+.r2 { animation-delay:-.8s !important; }
+.r3 { animation-delay:-1.6s !important; }
+@keyframes rip-out { from { transform:scale(1); opacity:.7; } to { transform:scale(1.7); opacity:0; } }
+@keyframes rip-in { from { transform:scale(1.7); opacity:0; } to { transform:scale(1.02); opacity:.6; } }
+.orb[data-state="speaking"] .rip { border-color:#FF6778; animation:rip-out 2.4s cubic-bezier(.22,.61,.36,1) infinite; }
+.orb[data-state="listening"] .rip { animation:rip-in 2.4s cubic-bezier(.55,.06,.68,.19) infinite; }
+
+/* Connecting: a spinning Apple Intelligence-style rainbow ring. */
+.spin-ring { position:absolute; inset:15.5%; border-radius:50%; opacity:0; pointer-events:none;
+  background:conic-gradient(from 0deg, #BC82F3, #F5B9EA, #8D9FFF, #FF6778, #FFBA71, #C686FF, #BC82F3);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  transition:opacity .4s ease; animation:aura-rot 1.4s linear infinite; }
+.spin-ring.bloom { filter:blur(10px); }
+.orb[data-state="connecting"] .spin-ring { opacity:1; }
+
+/* The glass button; red with a hang-up icon during a call. */
+#talk-btn { position:relative; z-index:1; width:60%; height:60%; padding:0; border-radius:50%; cursor:pointer;
+  font:inherit; display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.85); background:rgba(255,255,255,.62); color:var(--fg);
+  -webkit-backdrop-filter:blur(24px) saturate(180%); backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 12px 32px rgba(70,30,90,.18);
+  scale:calc(1 + var(--level) * .04);
+  transition:background-color .45s ease, color .45s ease, border-color .45s ease, scale .18s var(--spring); }
+#talk-btn:active:not(:disabled) { scale:.95; }
+#talk-btn.in-call { background:var(--end); color:#fff; border-color:rgba(255,255,255,.35); }
+#talk-btn:disabled { opacity:.75; cursor:default; }
+.btn-face { display:flex; flex-direction:column; align-items:center; gap:8px; padding:0 10%; }
+.btn-face svg { width:clamp(38px, 7vmin, 54px); height:clamp(38px, 7vmin, 54px); }
+.btn-text { font-size:clamp(26px, 5vmin, 38px); font-weight:700; line-height:1.15; text-align:center; }
+.pop { animation:pop .55s var(--spring); }
+@keyframes pop { from { transform:scale(.6); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+#status { margin:0; min-height:2.6em; padding:0 8px; text-align:center; font-size:clamp(26px, 4.5vmin, 36px);
+  font-weight:700; letter-spacing:-.01em; line-height:1.25; color:var(--fg); }
+#status.hint { color:var(--muted); }
+/* Thinking: a colour shimmer sweeps across the words. */
+#status.shimmer { background:linear-gradient(90deg, #1C1C1E 0%, #1C1C1E 38%, #9B5DE5 46%, #E0475B 50%, #C9721F 54%, #1C1C1E 62%, #1C1C1E 100%);
+  background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:sweep 1.8s linear infinite; }
+@keyframes sweep { from { background-position:100% 0; } to { background-position:-150% 0; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .orb .ring { animation:none !important; transition:none; scale:1.08 !important; opacity:.5 !important; }
+  .aura, .glow, .rip, .spin-ring, .pop, #status.shimmer { animation:none !important; }
+  .aura-scale, #talk-btn { transition:none; }
+  #status.shimmer { background:none; color:var(--fg); }
 }

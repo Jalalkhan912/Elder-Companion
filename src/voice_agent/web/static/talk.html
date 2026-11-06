@@ -2,19 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF7F2">
 <title>Talk</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="talk">
-<div class="orb" data-state="idle">
-  <span class="ring r1" aria-hidden="true"></span>
-  <span class="ring r2" aria-hidden="true"></span>
-  <span class="ring r3" aria-hidden="true"></span>
-  <button id="talk-btn" type="button" disabled>Talk</button>
-</div>
-<p id="status" role="status" aria-live="polite"></p>
-<a class="settings-link" href="/setup">settings</a>
+<header class="talk-head">
+  <div>
+    <p id="date-line" class="date-line"></p>
+    <h1 id="greeting" class="greeting">Hello</h1>
+  </div>
+  <a class="settings-btn" href="/setup" aria-label="Settings">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </a>
+</header>
+<main class="talk-main">
+  <div class="orb" data-state="idle">
+    <div class="aura-scale" aria-hidden="true">
+      <div class="aura">
+        <span class="glow g1"></span>
+        <span class="glow g2"></span>
+        <span class="glow g3"></span>
+        <span class="glow g4"></span>
+      </div>
+    </div>
+    <span class="rip" aria-hidden="true"></span>
+    <span class="rip r2" aria-hidden="true"></span>
+    <span class="rip r3" aria-hidden="true"></span>
+    <span class="spin-ring bloom" aria-hidden="true"></span>
+    <span class="spin-ring" aria-hidden="true"></span>
+    <button id="talk-btn" type="button" disabled>
+      <span class="btn-face" id="talk-face">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span class="btn-text" id="talk-label">Talk</span>
+      </span>
+      <span class="btn-face" id="end-face" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path transform="rotate(135 12 12)" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="btn-text">End</span>
+      </span>
+    </button>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+</main>
 <audio id="audio-sink" autoplay></audio>
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
 <script src="/static/talk.js"></script>

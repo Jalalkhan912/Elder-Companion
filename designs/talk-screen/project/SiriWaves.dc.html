@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Siri Waves</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+body{margin:0}
+a{color:#C9CDD8}a:hover{color:#FFFFFF}
+.wv-box{position:relative;width:390px;height:240px;
+  -webkit-mask-image:radial-gradient(ellipse 50% 60% at 50% 50%,#000 35%,transparent 100%);
+  mask-image:radial-gradient(ellipse 50% 60% at 50% 50%,#000 35%,transparent 100%)}
+.wv-mid{position:absolute;left:0;right:0;top:119px;height:2px;background:rgba(255,255,255,.35)}
+.wv-layer{position:absolute;inset:0;mix-blend-mode:screen;transition:transform .12s linear,opacity .6s ease}
+.wv-move{position:absolute;left:0;top:0;width:900px;height:240px;animation:wv-slide var(--d) linear infinite}
+.wv-path{vector-effect:non-scaling-stroke}
+@keyframes wv-slide{to{transform:translateX(calc(-1 * var(--p)))}}
+@keyframes wv-shimmer{from{opacity:.45}to{opacity:1}}
+.st-idle .wv-move{animation-duration:calc(var(--d) * 3)}
+.st-connecting .wv-move,.st-thinking .wv-move{animation-duration:calc(var(--d) * .4)}
+.st-thinking .wv-layer{animation:wv-shimmer .7s ease-in-out infinite alternate}
+.st-idle .wv-layer{opacity:.5}
+.wv-btn{transition:background-color .4s ease,color .4s ease,transform .15s ease}
+.wv-btn:active{transform:scale(.97)}
+.wv-btn:focus-visible,a:focus-visible{outline:6px solid #FFFFFF;outline-offset:6px}
+.wv-chip:focus-visible{outline:4px solid #000000;outline-offset:3px}
+@media (prefers-reduced-motion: reduce){.wv-move,.wv-layer{animation:none !important}}
+</style>
+</helmet>
+<div class="st-{{st}}" style="width: 390px; height: 994px; display: flex; flex-direction: column; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; background: #E9E6DF; color: #141414">
+  <div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #0A0D18; color: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px">
+    <p role="status" aria-live="polite" style="margin: 0; min-height: 84px; padding: 0 24px; display: flex; align-items: flex-end; justify-content: center; text-align: center; font-size: 32px; font-weight: 700; line-height: 1.3; color: {{statusColor}}">{{status}}</p>
+    <div class="wv-box" aria-hidden="true">
+      <div class="wv-mid"></div>
+      <sc-for list="{{waves}}" as="w" hint-placeholder-count="4">
+        <div class="wv-layer" style="transform: scaleY({{w.amp}})">
+          <div class="wv-move" style="--p: {{w.period}}px; --d: {{w.dur}}s">
+            <svg width="900" height="240" viewBox="0 0 900 240">
+              <path class="wv-path" d="{{w.d}}" fill="{{w.fill}}" stroke="{{w.color}}" stroke-width="2"></path>
+            </svg>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <button class="wv-btn" type="button" onClick="{{press}}" style="margin-top: 40px; width: 318px; height: 104px; border: 0; border-radius: 52px; cursor: pointer; font-family: inherit; font-size: 34px; font-weight: 700; background: {{btnBg}}; color: {{btnFg}}; box-shadow: 0 12px 40px rgba(80, 120, 255, 0.25)">{{btnLabel}}</button>
+    <a href="#settings" style="position: absolute; right: 24px; bottom: 28px; font-size: 20px">settings</a>
+  </div>
+  <div style="height: 150px; box-sizing: border-box; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #D3CEC4">
+    <p style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4A4640">Preview a state · or tap the big button</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+        <button class="wv-chip" type="button" onClick="{{c.pick}}" style="height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #1F1D1A; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"agentName":{"editor":"text","default":"Sam"},"$preview":{"width":390,"height":994}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { st: 'idle', forced: null, lvl: 0 };
+    this.lv = 0;
+    const make = (p) => {
+      let d = 'M0 120';
+      for (let x = 0; x <= 900; x += 5) d += ' L' + x + ' ' + (120 - 100 * Math.sin((2 * Math.PI * x) / p)).toFixed(1);
+      return d + ' L900 120 Z';
+    };
+    this.waveDefs = [
+      { color: '#3FA9FF', fill: 'rgba(63,169,255,0.28)', period: 180, dur: 2.2, k: 1 },
+      { color: '#B04CFF', fill: 'rgba(176,76,255,0.26)', period: 130, dur: 1.6, k: 0.75 },
+      { color: '#FF4F8B', fill: 'rgba(255,79,139,0.24)', period: 225, dur: 2.9, k: 0.6 },
+      { color: '#4DFFD2', fill: 'rgba(77,255,210,0.20)', period: 150, dur: 1.9, k: 0.9 }
+    ].map((w) => Object.assign({ d: make(w.period) }, w));
+  }
+  componentDidMount() {
+    this.t0 = Date.now();
+    this.iv = setInterval(() => this.tick(), 50);
+  }
+  componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.to); }
+  cur() { return this.state.forced || this.state.st; }
+  tick() {
+    const st = this.cur();
+    let target = 0;
+    if (st === 'listening' || st === 'speaking') {
+      const t = (Date.now() - this.t0) / 1000;
+      const words = Math.max(0, Math.sin(t * 1.7) + 0.35);
+      const syl = Math.abs(Math.sin(t * 9.1)) * 0.7 + Math.random() * 0.3;
+      target = Math.min(1, words * syl * (st === 'speaking' ? 1 : 0.8));
+    }
+    this.lv += (target - this.lv) * (target > this.lv ? 0.35 : 0.12);
+    if (this.lv < 0.004) this.lv = 0;
+    if (Math.abs(this.lv - this.state.lvl) > 0.004 || (this.lv === 0 && this.state.lvl !== 0)) this.setState({ lvl: this.lv });
+  }
+  go(st, ms, next) {
+    clearTimeout(this.to);
+    this.setState({ st: st });
+    if (next) this.to = setTimeout(next, ms);
+  }
+  demo() {
+    this.go('listening', 4200, () => this.go('thinking', 1800, () => this.go('speaking', 5200, () => this.demo())));
+  }
+  press() {
+    if (this.cur() === 'idle') {
+      this.setState({ forced: null });
+      this.go('connecting', 1800, () => this.demo());
+    } else {
+      clearTimeout(this.to);
+      this.setState({ forced: null, st: 'idle' });
+    }
+  }
+  renderVals() {
+    const st = this.cur();
+    const name = this.props.agentName ?? 'Sam';
+    const live = st === 'listening' || st === 'thinking' || st === 'speaking';
+    const l = this.state.lvl;
+    const status = { idle: 'Tap the button to talk', connecting: 'Connecting…', listening: name + ' is listening', thinking: 'One moment…', speaking: name + ' is speaking' }[st];
+    const waves = this.waveDefs.map((w) => {
+      let a;
+      if (st === 'idle') a = 0.02;
+      else if (st === 'connecting') a = 0.22 * w.k;
+      else if (st === 'thinking') a = 0.16 * w.k;
+      else if (st === 'listening') a = 0.06 + l * 0.7 * w.k;
+      else a = 0.08 + l * 0.95 * w.k;
+      return { d: w.d, color: w.color, fill: w.fill, period: w.period, dur: w.dur, amp: a.toFixed(3) };
+    });
+    const chips = ['idle', 'connecting', 'listening', 'thinking', 'speaking'].map((k) => ({
+      label: k[0].toUpperCase() + k.slice(1),
+      bg: k === st ? '#1F1D1A' : '#FFFFFF',
+      fg: k === st ? '#FFFFFF' : '#1F1D1A',
+      pick: () => { clearTimeout(this.to); this.setState({ forced: k }); }
+    }));
+    return {
+      st: st,
+      status: status,
+      statusColor: st === 'idle' ? '#B9BDC9' : '#FFFFFF',
+      btnLabel: live ? 'End' : 'Talk to ' + name,
+      btnBg: live ? '#D23434' : '#FFFFFF',
+      btnFg: live ? '#FFFFFF' : '#0A0D18',
+      waves: waves,
+      chips: chips,
+      press: () => this.press()
+    };
+  }
+}
+</script>
+</body>
+</html>

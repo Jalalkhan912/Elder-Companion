@@ -1,0 +1,19 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-06T12:00:00Z"},
+  "title": "Elder Companion Voice Designs",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 994, "title": "1 · Edge Glow", "is_interactive": true},
+    "SiriOrb.dc.html": {"x": 470, "y": 0, "w": 390, "h": 994, "title": "2 · Siri Orb", "is_interactive": true},
+    "SiriWaves.dc.html": {"x": 940, "y": 0, "w": 390, "h": 994, "title": "3 · Siri Waves", "is_interactive": true},
+    "WarmAurora.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 994, "title": "4 · Warm Aurora", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "SiriOrb.dc.html", "SiriWaves.dc.html", "WarmAurora.dc.html"],
+  "notes": {
+    "heading": {"x": 0, "y": -300, "text": "Talk screen · 4 Siri-style concepts", "kind": "title1", "maxW": 1800},
+    "howto": {"x": -440, "y": 0, "w": 360, "text": "How to test: press Play on a board, then tap the big button for an automatic demo (connecting → listening → thinking → speaking, on a loop). Or pick a state in the grey strip under each phone. Voice volume is simulated so the motion reacts like a real call.", "fill": "orange", "size": "m"}
+  },
+  "designSystems": []
+}

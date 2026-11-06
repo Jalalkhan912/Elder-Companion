@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edge Glow</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+body{margin:0}
+a{color:#3A3631}a:hover{color:#111111}
+.eg-layer{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .7s ease}
+.eg-bloom{filter:blur(16px)}
+.eg-edge{position:absolute;inset:0;box-sizing:border-box;overflow:hidden;
+  -webkit-mask-image:linear-gradient(#000 0 0),linear-gradient(#000 0 0);-webkit-mask-clip:content-box,border-box;-webkit-mask-composite:xor;
+  mask-image:linear-gradient(#000 0 0),linear-gradient(#000 0 0);mask-clip:content-box,border-box;mask-composite:exclude;
+  transition:padding .12s linear}
+.eg-spin{position:absolute;left:50%;top:50%;width:1100px;height:1100px;margin:-550px 0 0 -550px;
+  background:conic-gradient(from 0deg,#3B82F6,#8B5CF6,#EC4899,#F97316,#FACC15,#22D3EE,#3B82F6);
+  animation:eg-rot 7s linear infinite}
+.eg-spin.two{opacity:.65;mix-blend-mode:screen;animation-duration:11s;animation-direction:reverse;
+  background:conic-gradient(from 90deg,#22D3EE,transparent 25%,#EC4899 50%,transparent 75%,#22D3EE)}
+@keyframes eg-rot{to{transform:rotate(360deg)}}
+@keyframes eg-breathe{0%,100%{opacity:.25}50%{opacity:.6}}
+@keyframes eg-shimmer{from{opacity:.55}to{opacity:1}}
+.st-idle .eg-layer{opacity:.4;animation:eg-breathe 5s ease-in-out infinite}
+.st-connecting .eg-layer,.st-listening .eg-layer,.st-speaking .eg-layer{opacity:1}
+.st-thinking .eg-layer{opacity:1;animation:eg-shimmer .9s ease-in-out infinite alternate}
+.st-idle .eg-spin{animation-duration:16s}
+.st-connecting .eg-spin{animation-duration:2.2s}
+.st-thinking .eg-spin{animation-duration:1.6s}
+.eg-btn{transition:transform .12s linear,background-color .5s ease}
+.eg-btn:focus-visible,.eg-chip:focus-visible,a:focus-visible{outline:6px solid #000;outline-offset:4px}
+@media (prefers-reduced-motion: reduce){.eg-spin,.eg-layer{animation:none !important}}
+</style>
+</helmet>
+<div class="st-{{st}}" style="width: 390px; height: 994px; display: flex; flex-direction: column; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; color: #141414; background: #E9E6DF">
+  <div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FBFAF7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 44px">
+    <div class="eg-layer eg-bloom" aria-hidden="true">
+      <div class="eg-edge" style="padding: {{bloomW}}px">
+        <div class="eg-spin"></div>
+        <div class="eg-spin two"></div>
+      </div>
+    </div>
+    <div class="eg-layer" aria-hidden="true">
+      <div class="eg-edge" style="padding: {{edgeW}}px">
+        <div class="eg-spin"></div>
+        <div class="eg-spin two"></div>
+      </div>
+    </div>
+    <button class="eg-btn" type="button" onClick="{{press}}" style="position: relative; width: 240px; height: 240px; border-radius: 50%; border: 0; cursor: pointer; font-family: inherit; font-size: 38px; font-weight: 700; line-height: 1.15; padding: 28px; color: #FFFFFF; background: {{btnBg}}; transform: scale({{btnScale}}); box-shadow: 0 18px 40px rgba(20, 20, 40, 0.18)">{{btnLabel}}</button>
+    <p role="status" aria-live="polite" style="position: relative; margin: 0; min-height: 84px; padding: 0 24px; text-align: center; font-size: 32px; font-weight: 700; line-height: 1.3; color: {{statusColor}}">{{status}}</p>
+    <a href="#settings" style="position: absolute; right: 24px; bottom: 28px; font-size: 20px">settings</a>
+  </div>
+  <div style="height: 150px; box-sizing: border-box; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #D3CEC4">
+    <p style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4A4640">Preview a state · or tap the big button</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+        <button class="eg-chip" type="button" onClick="{{c.pick}}" style="height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #1F1D1A; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"agentName":{"editor":"text","default":"Sam"},"$preview":{"width":390,"height":994}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { st: 'idle', forced: null, lvl: 0 };
+    this.lv = 0;
+  }
+  componentDidMount() {
+    this.t0 = Date.now();
+    this.iv = setInterval(() => this.tick(), 50);
+  }
+  componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.to); }
+  cur() { return this.state.forced || this.state.st; }
+  tick() {
+    const st = this.cur();
+    let target = 0;
+    if (st === 'listening' || st === 'speaking') {
+      const t = (Date.now() - this.t0) / 1000;
+      const words = Math.max(0, Math.sin(t * 1.7) + 0.35);
+      const syl = Math.abs(Math.sin(t * 9.1)) * 0.7 + Math.random() * 0.3;
+      target = Math.min(1, words * syl * (st === 'speaking' ? 1 : 0.8));
+    }
+    this.lv += (target - this.lv) * (target > this.lv ? 0.35 : 0.12);
+    if (this.lv < 0.004) this.lv = 0;
+    if (Math.abs(this.lv - this.state.lvl) > 0.004 || (this.lv === 0 && this.state.lvl !== 0)) this.setState({ lvl: this.lv });
+  }
+  go(st, ms, next) {
+    clearTimeout(this.to);
+    this.setState({ st: st });
+    if (next) this.to = setTimeout(next, ms);
+  }
+  demo() {
+    this.go('listening', 4200, () => this.go('thinking', 1800, () => this.go('speaking', 5200, () => this.demo())));
+  }
+  press() {
+    if (this.cur() === 'idle') {
+      this.setState({ forced: null });
+      this.go('connecting', 1800, () => this.demo());
+    } else {
+      clearTimeout(this.to);
+      this.setState({ forced: null, st: 'idle' });
+    }
+  }
+  renderVals() {
+    const st = this.cur();
+    const name = this.props.agentName ?? 'Sam';
+    const live = st === 'listening' || st === 'thinking' || st === 'speaking';
+    const l = this.state.lvl;
+    const status = { idle: 'Tap the button to talk', connecting: 'Connecting…', listening: name + ' is listening', thinking: 'One moment…', speaking: name + ' is speaking' }[st];
+    const edge = { idle: 3, connecting: 9, listening: 7 + l * 26, thinking: 11, speaking: 9 + l * 34 }[st];
+    const chips = ['idle', 'connecting', 'listening', 'thinking', 'speaking'].map((k) => ({
+      label: k[0].toUpperCase() + k.slice(1),
+      bg: k === st ? '#1F1D1A' : '#FFFFFF',
+      fg: k === st ? '#FFFFFF' : '#1F1D1A',
+      pick: () => { clearTimeout(this.to); this.setState({ forced: k }); }
+    }));
+    return {
+      st: st,
+      status: status,
+      statusColor: st === 'idle' ? '#5C564D' : '#141414',
+      btnLabel: live ? 'End' : 'Talk to ' + name,
+      btnBg: live ? '#7A1010' : '#0B3D91',
+      btnScale: (1 + l * 0.05).toFixed(3),
+      edgeW: edge.toFixed(1),
+      bloomW: (edge * 2.2 + 8).toFixed(1),
+      chips: chips,
+      press: () => this.press()
+    };
+  }
+}
+</script>
+</body>
+</html>

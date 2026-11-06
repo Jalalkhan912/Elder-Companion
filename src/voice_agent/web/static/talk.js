@@ -9,6 +9,9 @@
   var attempt = 0;
   var userEnded = false;
   var agentP = null;
+  var talkFace = document.getElementById("talk-face");
+  var endFace = document.getElementById("end-face");
+  var talkLabel = document.getElementById("talk-label");
 
   // --- Siri-like orb: the state picks the animation, the voice volume sets --level ---
   var orb = document.querySelector(".orb");
@@ -46,6 +49,7 @@
     orb.setAttribute("data-state", state);
     var live = state === "listening" || state === "thinking" || state === "speaking";
     orb.classList.toggle("in-call", live);
+    statusEl.classList.toggle("shimmer", state === "thinking");
     if (live) {
       if (!raf && !calm) raf = requestAnimationFrame(tick);
       return;
@@ -60,7 +64,35 @@
     "Please ask your family to check the setup.";
   var MIC_MSG = "Please allow the microphone, then tap to try again.";
 
-  function setStatus(t) { statusEl.textContent = t; }
+  // An empty status shows a gentle "Tap to talk" hint while no call is running.
+  function setStatus(t) {
+    var hint = !t && !inCall && !btn.disabled;
+    statusEl.textContent = hint ? "Tap to talk" : t;
+    statusEl.classList.toggle("hint", hint);
+  }
+  // Swap the button between its Talk and End faces, with a small spring "pop".
+  function setButton(live) {
+    var changed = btn.classList.contains("in-call") !== live;
+    btn.classList.toggle("in-call", live);
+    talkFace.hidden = live;
+    endFace.hidden = !live;
+    if (live) btn.setAttribute("aria-label", "End the call");
+    else btn.removeAttribute("aria-label");
+    if (changed && !calm) {
+      var f = live ? endFace : talkFace;
+      f.classList.remove("pop");
+      void f.offsetWidth; // restart the animation
+      f.classList.add("pop");
+    }
+  }
+  function showGreeting(nickname) {
+    var now = new Date();
+    var h = now.getHours();
+    var g = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    document.getElementById("greeting").textContent = nickname ? g + ", " + nickname : g;
+    document.getElementById("date-line").textContent =
+      now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
   // Browsers only allow the microphone on https:// pages (or localhost).
   function micUnavailable() {
     return !window.isSecureContext || !navigator.mediaDevices ||
@@ -73,8 +105,8 @@
   function idle() {
     inCall = false;
     btn.disabled = false;
-    btn.classList.remove("in-call");
-    btn.textContent = "Talk to " + agentName;
+    talkLabel.textContent = "Talk to " + agentName;
+    setButton(false);
     agentP = null;
     setOrb("idle");
   }
@@ -82,7 +114,7 @@
   function agentLabel(state) {
     if (state === "listening") return agentName + " is listening";
     if (state === "speaking") return agentName + " is speaking";
-    if (state === "thinking") return "…";
+    if (state === "thinking") return "One moment\u2026";
     return null;
   }
   function isAgent(p) {
@@ -164,7 +196,7 @@
           stopTimer();
           agentP = p;
           if (!done) { done = true; inCall = true; attempt = 0; userEnded = false;
-            btn.disabled = false; btn.classList.add("in-call"); btn.textContent = "End"; }
+            btn.disabled = false; setButton(true); }
           updateFromAgent(p);
         }
         r.on(E.ParticipantConnected, onAgent);
@@ -184,7 +216,7 @@
             if (userEnded) { idle(); setStatus(""); return; }
             // connection dropped mid-call: retry once automatically
             attempt = 1;
-            btn.classList.remove("in-call");
+            setButton(false);
             startAttempt();
           } else if (!done) { giveUp(); }
         });
@@ -223,7 +255,9 @@
   fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
     if (!s.configured) { window.location.href = "/setup"; return; }
     agentName = s.agent_name;
+    showGreeting(s.parent_nickname);
+    setInterval(function () { showGreeting(s.parent_nickname); }, 60000);
     idle();
-    if (micUnavailable()) setStatus(INSECURE_MSG);
+    setStatus(micUnavailable() ? INSECURE_MSG : "");
   }).catch(function () { setStatus("Couldn’t load. Please reload."); });
 })();
