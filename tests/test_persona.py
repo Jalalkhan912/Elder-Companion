@@ -57,3 +57,10 @@ def test_greeting_uses_nickname(profile):
 
 def test_goodbye():
     assert "goodbye" in GOODBYE_INSTRUCTIONS.lower()
+
+
+def test_ending_the_call_rules(profile):
+    text = build_instructions(profile, [])
+    assert "end_conversation" in text
+    assert "agree" in text  # winding down: ask first, end only if they agree
+    assert "Never end the call" in text  # not during a safety moment

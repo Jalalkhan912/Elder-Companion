@@ -64,7 +64,11 @@ class CompanionAgent(Agent):
 
     @function_tool
     async def end_conversation(self, context: RunContext) -> None:
-        """Call after you and the parent have said goodbye."""
+        """Hang up the call.
+
+        Use only after the parent has said goodbye or agreed to stop talking, and never
+        during a safety worry. Say your goodbye in the same turn, before calling this.
+        """
         if self.end_reason is None:  # keep "silence"/"time_limit" if those started the goodbye
             self.end_reason = "goodbye"
         session = context.session
